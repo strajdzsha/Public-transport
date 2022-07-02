@@ -78,3 +78,14 @@ void Line::createEmptyAdjMatrix(int size)
 		this->adjMatrix.push_back(row);
 	}
 }
+
+bool Line::containsStation(int id)
+{
+	for (int i = 0; i < this->getNOfStations(); i++)
+	{
+		if (this->stations[i]->getId() == id) {
+			return true;
+		}
+	}
+	return false;
+}

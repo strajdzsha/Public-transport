@@ -29,6 +29,7 @@ public:
 	int getNOfStations() { return this->stations.size(); }
 	int nOfDepartures() { return (this->lastDeparture->convertToMinutes() - this->firstDeparture->convertToMinutes()) / this->interval + 1; }
 	bool areConnected(int id1, int id2) { return this->adjMatrix[id1][id2]; }
+	bool containsStation(int id);
 	void setId(int id) { this->id = id; }
 	void addStation(Station* s) { this->stations.push_back(s); }
 	void addConnection(int id1, int id2) { this->adjMatrix[id1][id2] = 1; }
