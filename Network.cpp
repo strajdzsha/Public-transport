@@ -128,18 +128,6 @@ int Network::getLineId(std::string lineName)
 	}
 }
 
-int Network::minDistance(std::vector<int>& dist, std::vector<bool> visited)
-{
-	int min = INT_MAX, minInd;
-	
-	for (int i = 0; i < this->stations.size(); i++)
-	{
-		if (visited[i] == false && dist[i] <= min) { min = dist[i]; minInd = i; }
-	}
-
-	return minInd;
-}
-
 void Network::createEmptyAdjMatrix()
 {
 	for (int i = 0; i < this->stations.size(); i++)
@@ -150,19 +138,6 @@ void Network::createEmptyAdjMatrix()
 			row.push_back(0);
 		}
 		this->adjMatrix.push_back(row);
-	}
-}
-
-void Network::createEmptyTimeMatrix()
-{
-	for (int i = 0; i < this->stations.size(); i++)
-	{
-		vector<int> row;
-		for (int j = 0; j < this->stations.size(); j++)
-		{
-			row.push_back(INT_MAX);
-		}
-		this->timeMatrix.push_back(row);
 	}
 }
 
@@ -181,30 +156,6 @@ void Network::createAdjMatrix()
 			l->addConnection(id2, id1);
 			this->adjMatrix[id1][id2] = 1;
 			this->adjMatrix[id2][id1] = 1;
-		}
-	}
-}
-
-void Network::createTimeMatrix(Time* t1)
-{
-	this->createEmptyTimeMatrix();
-	for (int i = 0; i < this->stations.size(); i++)
-	{
-		for (int j = i; j < this->stations.size(); j++)
-		{
-			int minTime = INT_MAX;
-			for (int k = 0; k < this->lines.size(); k++)
-			{
-				Line* l = this->lines[k];
-				int time = INT_MAX;
-				if (l->areConnected(i, j)) {
-					int t2 = l->closestArrival(t1, i);
-					time = t2 - t1->convertToMinutes() + TIME_BETWEEN_STATIONS;
-				}
-				if (time < minTime) { minTime = time; }
-			}
-			this->timeMatrix[i][j] = minTime;
-			this->timeMatrix[j][i] = minTime;
 		}
 	}
 }
@@ -230,43 +181,6 @@ void Network::findAnyPath(int id1, int id2, string& path, std::vector<bool>& vis
 			}
 		}
 	}
-}
-
-void Network::findMinTimePath(int id1, int id2)
-{
-	vector<int> distance;
-	vector<bool> visited;
-	vector<int> path;
-
-	for (int i = 0; i < this->stations.size(); i++)
-	{
-		path.push_back(-1);
-		distance.push_back(INT_MAX);
-		visited.push_back(0);
-	}
-	distance[id1] = 0;
-
-	for (int i = 0; i < this->stations.size() - 1; i++)
-	{
-		int u = minDistance(distance, visited);
-		visited[u] = true;
-
-		for (int j = 0; j < this->stations.size(); j++)
-		{
-			if (visited[j] == false && this->timeMatrix[u][j] != INT_MAX && distance[u] + this->timeMatrix[u][j] < distance[j]) { 
-				path[j] = u; 
-				distance[j] = distance[u] + this->timeMatrix[u][j];
-				//if (j == id2) { break; }
-			}
-		}
-	}
-
-	//this->printPath(path);
-	this->printPath(distance);
-}
-
-void Network::findMinTransferPath(int id1, int id2, std::vector<bool>& visited)
-{
 }
 
 void Network::printPath(std::vector<int> path)
@@ -325,21 +239,6 @@ void Network::printAdjMatrix()
 		for (int j = 0; j < this->stations.size(); j++)
 		{
 			cout << this->adjMatrix[i][j] << ' ';
-		}
-		cout << '\n';
-	}
-}
-
-void Network::printTimeMatrix()
-{
-	for (int i = 0; i < this->stations.size(); i++)
-	{
-		for (int j = 0; j < this->stations.size(); j++)
-		{
-			if (this->timeMatrix[i][j] == INT_MAX)
-				cout << "inf" << ' ';
-			else
-				cout << this->timeMatrix[i][j] << ' ';
 		}
 		cout << '\n';
 	}
@@ -461,13 +360,65 @@ void Network::findPath(int code1, int code2, Method m)
 		this->findAnyPath(id1, id2, path, visited, found);
 		break;
 	case minTime:
-		this->createTimeMatrix(t);
-		this->findMinTimePath(id1, id2);
+		//this->createTimeMatrix(t, id1);
+		//this->findMinTimePath(id1, id2);
 		break;
 	case minTransfer:
-		this->findMinTransferPath(id1, id2, visited);
+		//this->findMinTransferPath(id1, id2, visited);
 		break;
 	default:
 		break;
 	}
+}
+
+int Network::minDistance(vector<int> dist, vector<bool> sptSet)
+{
+	int V = this->stations.size();
+	// Initialize min value
+	int min = INT_MAX, min_index;
+
+	for (int v = 0; v < V; v++)
+		if (sptSet[v] == false && dist[v] <= min)
+			min = dist[v], min_index = v;
+
+	return min_index;
+}
+
+int Network::distanceTwoStations(int id1, int id2, Time* currTime)
+{
+	return this->adjMatrix[id1][id2];
+}
+
+void Network::dijkstra(int srcCode, Time* currTime)
+{
+	int src = this->getStationId(srcCode);
+	int V = this->stations.size();
+	vector<int> dist(V);
+
+	vector<bool> visited(V);
+
+	for (int i = 0; i < V; i++)
+		dist[i] = INT_MAX, visited[i] = false;
+
+	dist[src] = 0;
+
+	for (int count = 0; count < V - 1; count++) {
+		int u = minDistance(dist, visited);
+
+		visited[u] = true;
+
+		for (int v = 0; v < V; v++)
+			if (!visited[v] && distanceTwoStations(u, v, currTime) && dist[u] != INT_MAX
+				&& dist[u] + distanceTwoStations(u, v, currTime) < dist[v])
+				dist[v] = dist[u] + distanceTwoStations(u, v, currTime);
+	}
+	printSolution(dist);
+}
+
+void Network::printSolution(vector<int> dist)
+{
+	int V = this->stations.size();
+	cout << "Vertex \t Distance from Source" << endl;
+	for (int i = 0; i < V; i++)
+		cout << i << " \t\t" << dist[i] << endl;
 }

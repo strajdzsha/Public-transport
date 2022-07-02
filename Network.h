@@ -21,11 +21,11 @@ public:
 	void printStations();
 	void printLines();
 	void printAdjMatrix();
-	void printTimeMatrix();
 	void stationInformation(int code);
 	void lineInformation(std::string lineName);
 	void lineStats(std::string lineName);
 	void findPath(int code1, int code2, Method m);
+	void dijkstra(int sourceCode, Time* currTime = NULL);
 private:
 	//Data
 	std::vector<Station*> stations;
@@ -33,6 +33,7 @@ private:
 	std::vector<std::vector<bool>> lineStationMatrix;
 	std::vector<std::vector<bool>> adjMatrix; //adjacency matrix
 	std::vector<std::vector<int>> timeMatrix;
+	std::vector<int> timeOfArrivalArray;
 	//Loading functions
 	std::string readWord(const std::string& s, int& i, char thermChar);
 	std::string readWord2(const std::string& s, int& i, char thermChar);
@@ -43,16 +44,14 @@ private:
 	//Other
 	int getStationId(int stationCode);
 	int getLineId(std::string lineName);
-	int minDistance(std::vector<int>& dist, std::vector<bool> visited);
 	void createEmptyAdjMatrix();
-	void createEmptyTimeMatrix();
 	void createAdjMatrix();
-	void createTimeMatrix(Time* t1);
 	void findAnyPath(int id1, int id2, std::string& path, std::vector<bool>& visited, bool& found);
-	void findMinTimePath(int id1, int id2);
-	void findMinTransferPath(int id1, int id2, std::vector<bool>& visited);
 	void printPath(std::vector<int> path);
 	std::string decodePath(const std::string& path);
+	int minDistance(std::vector<int> dist, std::vector<bool> sptSet);
+	int distanceTwoStations(int id1, int id2, Time* currTime = NULL);
+	void printSolution(std::vector<int> dist);
 };
 
 #endif
