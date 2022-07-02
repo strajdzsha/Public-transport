@@ -31,7 +31,7 @@ private:
 	std::vector<Station*> stations;
 	std::vector<Line*> lines;
 	std::vector<std::vector<bool>> lineStationMatrix;
-	std::vector<std::vector<bool>> adjMatrix; //adjacency matrix
+	std::vector<std::vector<int>> adjMatrix; //adjacency matrix
 	std::vector<std::vector<int>> timeMatrix;
 	std::vector<int> timeOfArrivalArray;
 	//Loading functions
@@ -46,11 +46,10 @@ private:
 	int getLineId(std::string lineName);
 	void createEmptyAdjMatrix();
 	void createAdjMatrix();
-	void findAnyPath(int id1, int id2, std::string& path, std::vector<bool>& visited, bool& found);
 	void printPath(std::vector<int> path);
 	std::string decodePath(const std::string& path);
 	int minDistance(std::vector<int> dist, std::vector<bool> sptSet);
-	int distanceTwoStations(int id1, int id2, Time* currTime = NULL);
+	int distanceTwoStations(int id1, int id2, int currTime = -1, Line* currLine = NULL);
 	void printSolution(std::vector<int> dist);
 };
 

@@ -2,7 +2,7 @@
 #include <iostream>
 constexpr auto MAX_HOURS = 24;
 constexpr auto MAX_MINUTES = 60;
-#define TIME_BETWEEN_STATIONS 3;
+#define TIME_BETWEEN_STATIONS 3
 
 using namespace std;
 
@@ -27,6 +27,11 @@ void Time::print() {
 	std::cout << this->hour << ":" << this->minute;
 }
 
+int Time::addMinutes(int minutes)
+{
+	return this->convertToMinutes() + minutes;
+}
+
 void Line::print() {
 	cout << this->lineName << endl;
 }
@@ -41,19 +46,20 @@ Station* Line::getStation(int id) {
 	return this->stations[id];
 }
 
-int Line::getArrivalTime(int stationId)
+int Line::getArrivalTime(int stationId, int direction)
 {
+	int n = this->getNOfStations();
 	for (int i = 0; i < this->stations.size(); i++)
 	{
-		if (this->stations[i]->getId() == stationId)
-			return this->firstDeparture->convertToMinutes() + i * TIME_BETWEEN_STATIONS;
+		if (this->stations[i]->getId() == stationId) {		
+			int tmp = direction == 1 ? i * TIME_BETWEEN_STATIONS : (n - 1 - i) * TIME_BETWEEN_STATIONS;
+			return this->firstDeparture->convertToMinutes() + tmp;
+		}
 	}
 }
 
-int Line::closestArrival(Time* t, int id) {
-	int time = t->convertToMinutes();
-	int res = this->getArrivalTime(id);
-	//int res = this->firstDeparture->convertToMinutes();
+int Line::closestArrival(int time, int id, int direction) {
+	int res = this->getArrivalTime(id, direction);
 	while (res < time) {
 		res += this->interval;
 	}

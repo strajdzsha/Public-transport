@@ -132,7 +132,7 @@ void Network::createEmptyAdjMatrix()
 {
 	for (int i = 0; i < this->stations.size(); i++)
 	{
-		vector<bool> row;
+		vector<int> row;
 		for (int j = 0; j < this->stations.size(); j++)
 		{
 			row.push_back(0);
@@ -155,30 +155,7 @@ void Network::createAdjMatrix()
 			l->addConnection(id1, id2);
 			l->addConnection(id2, id1);
 			this->adjMatrix[id1][id2] = 1;
-			this->adjMatrix[id2][id1] = 1;
-		}
-	}
-}
-
-void Network::findAnyPath(int id1, int id2, string& path, std::vector<bool>& visited, bool& found)
-{
-	if (found) { return; }
-	visited[id1] = 1;
-	string pathtmp = path;
-	if (this->adjMatrix[id1][id2] == 1) {
-		path += to_string(id1) + "->" + to_string(id2);
-		cout << path;
-		found = 1;
-		//cout << this->decodePath(path);
-	}
-	else {
-		for (int i = 0; i < this->stations.size(); i++)
-		{
-			if (!visited[i] && this->adjMatrix[id1][i] == 1) {
-				path += to_string(id1) + "->" + to_string(i) + " ";
-				findAnyPath(i, id2, path, visited, found);
-				path = pathtmp;
-			}
+			this->adjMatrix[id2][id1] = 2;
 		}
 	}
 }
@@ -189,37 +166,6 @@ void Network::printPath(std::vector<int> path)
 	{
 		cout << path[i] << " ";
 	}
-}
-
-std::string Network::decodePath(const string& path)
-{
-	// aj iskomentarisi i sredi ovo majke ti
-	string fullPath = "";
-	Line* curr = this->lines[0];
-	int i = 0;
-	while (i < path.size()) {
-		int id1 = stoi(this->readWord(path, i, '-'));
-		i++;
-		int id2 = stoi(this->readWord(path, i, ' '));
-		if (curr->areConnected(id1, id2)) {
-			fullPath += to_string(this->stations[id1]->getCode()) + ' ';
-			if (i >= path.size() - 1) { fullPath += to_string(this->stations[id2]->getCode()); }
-		}
-		else {
-			for (int j = 0; j < this->lines.size(); j++)
-			{
-				if (this->lines[j]->areConnected(id1, id2)) {
-					fullPath += to_string(this->stations[id1]->getCode()) + ' ';
-					fullPath += '\n' + curr->getName() + "->" + this->lines[j]->getName() + '\n';
-					curr = this->lines[j];
-					fullPath += to_string(this->stations[id1]->getCode()) + ' ';
-					break;
-				}
-			}
-		}
-	}
-
-	return fullPath;
 }
 
 void Network::printStations()
@@ -357,7 +303,7 @@ void Network::findPath(int code1, int code2, Method m)
 	switch (m)
 	{
 	case any:
-		this->findAnyPath(id1, id2, path, visited, found);
+		//this->findAnyPath(id1, id2, path, visited, found);
 		break;
 	case minTime:
 		//this->createTimeMatrix(t, id1);
@@ -384,17 +330,54 @@ int Network::minDistance(vector<int> dist, vector<bool> sptSet)
 	return min_index;
 }
 
-int Network::distanceTwoStations(int id1, int id2, Time* currTime)
+int Network::distanceTwoStations(int id1, int id2, int currTime, Line* currLine)
 {
-	return this->adjMatrix[id1][id2];
+	if (currTime != -1){
+		// distance coresponds to min time of travel
+		if (this->adjMatrix[id1][id2] == 0) {
+			return -1;
+		}
+		else {
+			int minIdx = -1;
+			int minTime = INT_MAX;
+			for (int i = 0; i < this->lines.size(); i++)
+			{
+				Line* l = this->lines[i];
+				if (l->areConnected(id1, id2)) {
+					int res = l->closestArrival(currTime, id1, this->adjMatrix[id1][id2]);
+					if (res < minTime) { minTime = res; minIdx = i; }
+				}
+				else {
+					continue;
+				}
+			}
+			return minTime - currTime + TIME_BETWEEN_STATIONS;
+		}
+	}
+	else {
+		// distance coresponds to min ammount of transfer needed between two stations
+		if (this->adjMatrix[id1][id2] == 0) {
+			return -1;
+		}
+		else {
+			int minIdx = -1;
+			int transfer = INT_MAX;
+			if (currLine->areConnected(id1, id2)) {
+				return 0;
+			}
+		}
+
+	}
 }
 
 void Network::dijkstra(int srcCode, Time* currTime)
 {
+	this->createAdjMatrix();
+
 	int src = this->getStationId(srcCode);
 	int V = this->stations.size();
-	vector<int> dist(V);
 
+	vector<int> dist(V);
 	vector<bool> visited(V);
 
 	for (int i = 0; i < V; i++)
@@ -408,9 +391,12 @@ void Network::dijkstra(int srcCode, Time* currTime)
 		visited[u] = true;
 
 		for (int v = 0; v < V; v++)
-			if (!visited[v] && distanceTwoStations(u, v, currTime) && dist[u] != INT_MAX
-				&& dist[u] + distanceTwoStations(u, v, currTime) < dist[v])
-				dist[v] = dist[u] + distanceTwoStations(u, v, currTime);
+			if (!visited[v] && distanceTwoStations(u, v, currTime->addMinutes(dist[u])) != -1 && dist[u] != INT_MAX
+				&& dist[u] + distanceTwoStations(u, v, currTime->addMinutes(dist[u])) < dist[v])
+			{	
+				dist[v] = dist[u] + distanceTwoStations(u, v, currTime->addMinutes(dist[u]));
+
+			}
 	}
 	printSolution(dist);
 }
@@ -420,5 +406,5 @@ void Network::printSolution(vector<int> dist)
 	int V = this->stations.size();
 	cout << "Vertex \t Distance from Source" << endl;
 	for (int i = 0; i < V; i++)
-		cout << i << " \t\t" << dist[i] << endl;
+		cout << this->stations[i]->getCode() << " \t\t" << dist[i] << endl;
 }

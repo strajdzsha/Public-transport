@@ -10,6 +10,7 @@ public:
 	Time() { this->hour = 0; this->minute = 0; }
 	Time(int hour, int minute) : hour(hour), minute(minute) { };
 	Time*& operator + (const Time&  obj);
+	int addMinutes(int minutes);
 	int convertToMinutes() { return this->hour * 60 + this->minute; }
 	void print();
 private:
@@ -22,8 +23,8 @@ public:
 	Line(const std::string& lineName, Time* firstDeparture, Time* lastDeparture, int interval) : lineName(lineName), firstDeparture(firstDeparture), lastDeparture(lastDeparture), interval(interval) { };
 	std::string getName() { return this->lineName; }
 	Station* getStation(int id);
-	int closestArrival(Time* t, int id);
-	int getArrivalTime(int stationId);
+	int closestArrival(int t, int id, int direction);
+	int getArrivalTime(int stationId, int direction);
 	int getId() { return this->id; }
 	int getNOfStations() { return this->stations.size(); }
 	int nOfDepartures() { return (this->lastDeparture->convertToMinutes() - this->firstDeparture->convertToMinutes()) / this->interval + 1; }

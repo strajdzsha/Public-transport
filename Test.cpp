@@ -10,14 +10,13 @@ int main() {
 	net->loadNetwork("stajalista-test.txt", "linije-test.txt");
 	//net->printStations();
 	//net->printLines();
-	net->findPath(0, 1, any);//ne komentarisi ovo
 	cout << '\n';
-	net->stationInformation(0);
-	net->dijkstra(0);
+	//net->stationInformation(0);
+	net->dijkstra(0, new Time(7, 0));
 	//net->lineInformation("12");
 	//net->lineStats("12");
 	//net->findPath(154, 578, minTime);
-	net->printAdjMatrix();
+	//net->printAdjMatrix();
 
 	return 1;
 }
