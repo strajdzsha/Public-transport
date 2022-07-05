@@ -1,5 +1,6 @@
 ﻿#include "Network.h"
 #include <iostream>
+#include <stack>
 
 using namespace std;
 #define TIME_BETWEEN_STATIONS 3;
@@ -112,6 +113,30 @@ void Network::addStationsToLine(const std::string& s, int& i, Line* line)
 	i++;
 }
 
+std::vector<int> Network::sharedLines(int id1, int id2)
+{
+	vector<int> sharedLines;
+	for (int i = 0; i < this->lines.size(); i++)
+	{
+		if (this->lineStationMatrix[i][id1] == 1 && this->lineStationMatrix[i][id2]) {
+			sharedLines.push_back(i);
+		}
+	}
+	return sharedLines;
+}
+
+std::vector<int> Network::findStartingLines(int id)
+{
+	vector<int> startingLines;
+	for (int i = 0; i < this->lines.size(); i++)
+	{
+		if (this->lineStationMatrix[i][id] == 1) {
+			startingLines.push_back(i);
+		}
+	}
+	return startingLines;
+}
+
 int Network::getStationId(int stationCode)
 {
 	for (int i = 0; i < this->stations.size(); i++)
@@ -157,6 +182,27 @@ void Network::createAdjMatrix()
 			this->adjMatrix[id1][id2] = 1;
 			this->adjMatrix[id2][id1] = 2;
 		}
+	}
+}
+
+void Network::createConnectionMatrix()
+{
+	for (int i = 0; i < this->stations.size(); i++)
+	{
+		vector<StationLine*> row;
+		for (int j = 0; j < this->stations.size(); j++)
+		{
+			if (i != j) {
+				for (int k = 0; k < this->lines.size(); k++)
+				{
+					if (this->lineStationMatrix[k][i] == 1 && this->lineStationMatrix[k][j] == 1) {
+						StationLine* tmp = new StationLine(j, this->lines[k]);
+						row.push_back(tmp);
+					}
+				}
+			}
+		}
+		this->connectionMatrix.push_back(row);
 	}
 }
 
@@ -261,32 +307,6 @@ void Network::lineStats(std::string lineName)
 	out.close();
 }
 
-void Network::findPath(int code1, int code2, Method m)
-{
-	Time* t = new Time(7, 0);
-	this->createAdjMatrix();
-	int id1 = this->getStationId(code1);
-	int id2 = this->getStationId(code2);///**** moras obezbediti id1 < id2
-	vector<bool> visited(this->stations.size(), 0);
-	string path = "";
-	bool found = 0;
-	switch (m)
-	{
-	case any:
-		//this->findAnyPath(id1, id2, path, visited, found);
-		break;
-	case minTime:
-		//this->createTimeMatrix(t, id1);
-		//this->findMinTimePath(id1, id2);
-		break;
-	case minTransfer:
-		//this->findMinTransferPath(id1, id2, visited);
-		break;
-	default:
-		break;
-	}
-}
-
 int Network::minDistance(vector<int> dist, vector<bool> sptSet)
 {
 	int V = this->stations.size();
@@ -300,77 +320,87 @@ int Network::minDistance(vector<int> dist, vector<bool> sptSet)
 	return min_index;
 }
 
-int Network::distanceTwoStations(int id1, int id2, vector<Line*> &lastLine, int currTime)
+int Network::distanceTwoStations(int id1, int id2, int currTime, Line* currLine)
 {
+	if (adjMatrix[id1][id2] == 0) return 0;
 	if (currTime != -1){
 		// distance coresponds to min time of travel
-		if (this->adjMatrix[id1][id2] == 0) {
-			return -1;
-		}
-		else {
-			int minIdx = -1;
-			int minTime = INT_MAX;
-			for (int i = 0; i < this->lines.size(); i++)
-			{
-				Line* l = this->lines[i];
-				if (l->areConnected(id1, id2)) {
-					int res = l->closestArrival(currTime, id1, this->adjMatrix[id1][id2]);
-					if (res < minTime) { minTime = res; minIdx = i; }
-				}
-				else {
-					continue;
-				}
-			}
-			this->parents[id2]->lineID = minIdx;
-			return minTime - currTime + TIME_BETWEEN_STATIONS;
-		}
+		this->distanceMinTime(id1, id2, currTime);
 	}
 	else {
 		// distance coresponds to min ammount of transfer needed between two stations
-		Line* currLine = lastLine[id1];
-		if (this->adjMatrix[id1][id2] == 0) {
-			return -1;
-		}
-		else {
-			int minIdx = -1;
-			int transfer = INT_MAX;
-			if (currLine->areConnected(id1, id2)) {
-				lastLine[id2] = currLine;
-				return 0;
-			}
-			for (int i = 0; i < this->lines.size(); i++)
-			{
-				Line* l = this->lines[i];
-				if (l->areConnected(id1, id2)) {
-					minIdx = i;
-					transfer = 1;
-					lastLine[id2] = l;
-					return transfer;
-				}
-			}
-		}
+		this->distanceMinTransfer(id1, id2, currLine);
 	}
 }
 
-void Network::dijkstra(int srcCode, int endCode, Time* currTime)
+int Network::distanceMinTime(int id1, int id2, int currTime)
+{
+	int minIdx = -1;
+	int minTime = INT_MAX;
+	for (int i = 0; i < this->lines.size(); i++)
+	{
+		Line* l = this->lines[i];
+		if (l->areConnected(id1, id2)) {
+			int res = l->closestArrival(currTime, id1, this->adjMatrix[id1][id2]);
+			if (res < minTime) { minTime = res; minIdx = i; }
+		}
+		else {
+			continue;
+		}
+	}
+	this->parents[id2]->lineID = minIdx;
+	return minTime - currTime + TIME_BETWEEN_STATIONS;
+}
+
+int Network::distanceMinTransfer(int id1, int id2, Line* currLine)
+{
+	int currLineID = currLine->getId();
+	if (this->parents[id1]->lineID == currLineID) {
+		this->parents[id2]->lineID = currLineID;
+		return 0;
+	}
+	else {
+		this->parents[id2]->lineID = currLineID;
+		return 1;
+	}
+}
+
+vector<int> Network::shareElement(std::vector<int> a, std::vector<int> b)
+{
+	vector<int> res;
+	for (int i = 0; i < a.size(); i++)
+	{
+		for (int j = 0; j < b.size(); j++)
+		{
+			if (a[i] == b[j]) {
+				res.push_back(a[i]);
+			}
+		}
+	}
+	return res;
+}
+
+Line* Network::getPrevLine(int currID)
+{
+	for (int i = 0; i < this->parentsTransfer.size(); i++)
+	{
+		NodeTrf* tmp = this->parentsTransfer[i];
+		if (tmp->dst == currID) return tmp->line;
+	}
+	return nullptr;
+}
+
+void Network::dijkstraMinTime(int srcCode, int endCode, Time* currTime)
 {
 	this->createAdjMatrix();
-	Line* currLine = nullptr;
 
-	int src = this->getStationId(srcCode);
-	int end = this->getStationId(endCode);
-	int V = this->stations.size();
-
-	currLine = this->findStartingLine(src);
-
+	int src = this->getStationId(srcCode), end = this->getStationId(endCode), V = this->stations.size();
 	vector<int> dist(V);
 	vector<bool> visited(V);
-	vector<Line*> lastLine(V);
 
 	for (int i = 0; i < V; i++) {
 		dist[i] = INT_MAX;
 		visited[i] = false;
-		lastLine[i] = nullptr;
 		Node* tmp = new Node();
 		this->parents.push_back(tmp);
 	}
@@ -378,7 +408,6 @@ void Network::dijkstra(int srcCode, int endCode, Time* currTime)
 	dist[src] = 0;
 	this->parents[src]->parent = -1;
 	this->parents[src]->lineID = -1;
-	lastLine[src] = currLine;
 
 	for (int count = 0; count < V - 1; count++) {
 		int u = minDistance(dist, visited);
@@ -386,25 +415,61 @@ void Network::dijkstra(int srcCode, int endCode, Time* currTime)
 		visited[u] = true;
 
 		for (int v = 0; v < V; v++)
-			if (currTime == nullptr) {
-				if (!visited[v] && distanceTwoStations(u, v, lastLine, -1) != -1 && dist[u] != INT_MAX
-					&& dist[u] + distanceTwoStations(u, v, lastLine, -1) < dist[v])
-				{
-					dist[v] = dist[u] + distanceTwoStations(u, v, lastLine, -1);
-					this->parents[v]->parent = u;
-				}
-			}
-			else {
-				if (!visited[v] && distanceTwoStations(u, v, lastLine, currTime->addMinutes(dist[u])) != -1 && dist[u] != INT_MAX
-					&& dist[u] + distanceTwoStations(u, v, lastLine, currTime->addMinutes(dist[u])) < dist[v])
-				{
-					dist[v] = dist[u] + distanceTwoStations(u, v, lastLine, currTime->addMinutes(dist[u]));
-					this->parents[v]->parent = u;
-				}
+			if (!visited[v] && distanceTwoStations(u, v, currTime->addMinutes(dist[u])) && dist[u] != INT_MAX
+				&& dist[u] + distanceTwoStations(u, v, currTime->addMinutes(dist[u])) < dist[v])
+			{
+				dist[v] = dist[u] + distanceTwoStations(u, v, currTime->addMinutes(dist[u]));
+				this->parents[v]->parent = u;
 			}
 	}
 
 	printPath(end);
+}
+
+void Network::dijkstraMinTransfer(int sourceCode, int endCode)
+{
+	this->createAdjMatrix();
+	this->createConnectionMatrix();
+
+	int src = this->getStationId(sourceCode), end = this->getStationId(endCode), V = this->stations.size();
+	vector<int> dist(V);
+	vector<bool> visited(V);
+
+	for (int i = 0; i < V; i++) {
+		dist[i] = INT_MAX;
+		visited[i] = false;
+	}
+
+	this->addParent(-1, src, nullptr);
+	dist[src] = 0;
+
+	for (int i = 0; i < V - 1; i++) {
+
+		int u = minDistance(dist, visited);
+		visited[u] = true;
+
+		for (int j = 0; j < this->connectionMatrix[u].size(); j++)
+		{
+			StationLine* curr = this->connectionMatrix[u][j];
+			int v = curr->id;
+			Line* currLine = curr->line;
+			
+			Line* prevLine = getPrevLine(u);
+			int distance;
+			if (currLine == prevLine) {
+				distance = dist[u];
+			}
+			else {
+				distance = dist[u] + 1;
+			}
+			if (distance < dist[v]) {
+				dist[v] = distance;
+				addParent(u, v, currLine);
+			}
+		}
+	}
+
+	printPath2(src, end);
 }
 
 void Network::userInterface()
@@ -418,6 +483,10 @@ void Network::userInterface()
 	else if (tmp == 1) {
 		this->userInterfaceLoading();
 	}
+	else if (tmp == 100) {
+		this->loadNetwork("stajalista.txt", "linije.txt");
+		this->dijkstraMinTransfer(123, 1);
+	}
 	else {
 		cout << "Greska: unesite validnu vrednost (1 ili 0)" << endl;
 		return;
@@ -430,6 +499,21 @@ void Network::printSolution(vector<int> dist, int src, int end)
 	int curr = src;
 
 	printPath(end);
+}
+
+void Network::addParent(int src, int dst, Line* l)
+{
+	for (int i = 0; i < this->parentsTransfer.size(); i++)
+	{
+		NodeTrf* tmp = this->parentsTransfer[i];
+		if (tmp->dst == dst) {
+			tmp->src = src;
+			tmp->line = l;
+			return;
+		}
+	}
+	NodeTrf* tmp = new NodeTrf(src, dst, l);
+	this->parentsTransfer.push_back(tmp);
 }
 
 void Network::printPath(int j)
@@ -446,6 +530,28 @@ void Network::printPath(int j)
 	else {
 		cout << this->stations[j]->getCode() << " ";
 	}
+}
+
+void Network::printPath2(int source, int end)
+{
+	int curr = end;
+	stack<NodeTrf*> path;
+	while (curr != source) {
+		for (int i = 0; i < this->parentsTransfer.size(); i++)
+		{
+			NodeTrf* tmp = this->parentsTransfer[i];
+			if (tmp->dst == curr) {
+				path.push(tmp);
+				curr = tmp->src;
+			}
+		}
+	}
+	for (int i = 0; i < path.size(); i++)
+	{
+		cout << path.top()->dst << " " << path.top()->line->getId() << endl;
+		path.pop();
+	}
+
 }
 
 void Network::userInterfaceLoading()
@@ -543,23 +649,13 @@ void Network::userInterfacePath()
 		hh = stoi(shh);
 		smm = time.substr(3, 5);
 		mm = stoi(smm);
-		this->dijkstra(src, end, new Time(hh, mm));
+		this->dijkstraMinTime(src, end, new Time(hh, mm));
 		return;
 	case 3:
-		return; // nije jos iskucano
+		this->dijkstraMinTransfer(src, end);
+		return;
 	default:
 		cout << "Greska: unesite jednu od validnih vrednosti (1-3).";
 		break;
 	}
-}
-
-Line* Network::findStartingLine(int src)
-{	
-	for (int i = 0; i < this->lines.size(); i++)
-	{
-		if (this->lines[i]->containsStation(src)) {
-			return this->lines[i];
-		}
-	}
-	return nullptr;
 }
