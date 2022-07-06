@@ -68,6 +68,7 @@ void Network::loadStations(const std::string& stationsPath)
 
 	int i = 0;
 	int id = 0;
+	if (sstations.length() < 1) throw InvalidPath();
 	while (i < sstations.length()) {
 		int code = stoi(readWord(sstations, i, ' '));
 		string name = readWord(sstations, i, '\n');
@@ -87,6 +88,7 @@ void Network::loadLines(const std::string& linesPath)
 
 	int i = 0;
 	int id = 0;
+	if (slines.length() < 1) throw InvalidPath();
 	while (i < slines.length()) {
 		Line* line;
 		line = this->readLineData(slines, i);
@@ -113,18 +115,6 @@ void Network::addStationsToLine(const std::string& s, int& i, Line* line)
 	i++;
 }
 
-std::vector<int> Network::sharedLines(int id1, int id2)
-{
-	vector<int> sharedLines;
-	for (int i = 0; i < this->lines.size(); i++)
-	{
-		if (this->lineStationMatrix[i][id1] == 1 && this->lineStationMatrix[i][id2]) {
-			sharedLines.push_back(i);
-		}
-	}
-	return sharedLines;
-}
-
 std::vector<int> Network::findStartingLines(int id)
 {
 	vector<int> startingLines;
@@ -143,6 +133,7 @@ int Network::getStationId(int stationCode)
 	{
 		if (this->stations[i]->getCode() == stationCode) { return this->stations[i]->getId(); }
 	}
+	throw StationDoesntExist();
 }
 
 int Network::getLineId(std::string lineName)
@@ -151,6 +142,7 @@ int Network::getLineId(std::string lineName)
 	{
 		if (this->lines[i]->getName() == lineName) { return this->lines[i]->getId(); }
 	}
+	throw LineDoesntExist();
 }
 
 void Network::createEmptyAdjMatrix()
@@ -192,13 +184,11 @@ void Network::createConnectionMatrix()
 		vector<StationLine*> row;
 		for (int j = 0; j < this->stations.size(); j++)
 		{
-			if (i != j) {
-				for (int k = 0; k < this->lines.size(); k++)
-				{
-					if (this->lineStationMatrix[k][i] == 1 && this->lineStationMatrix[k][j] == 1) {
-						StationLine* tmp = new StationLine(j, this->lines[k]);
-						row.push_back(tmp);
-					}
+			for (int k = 0; k < this->lines.size(); k++)
+			{
+				if (this->lineStationMatrix[k][i] == 1 && this->lineStationMatrix[k][j] == 1 && (this->adjMatrix[i][j] || i == j)) {
+					StationLine* tmp = new StationLine(j, this->lines[k]);
+					row.push_back(tmp);
 				}
 			}
 		}
@@ -262,6 +252,8 @@ void Network::lineInformation(std::string lineName)
 	{
 		Station* st = this->lines[lineId]->getStation(i);
 		if (st == nullptr) { break; }
+		output += to_string(st->getCode());
+		output += " ";
 		output += st->getName();
 		output += '\n';
 	}
@@ -365,21 +357,6 @@ int Network::distanceMinTransfer(int id1, int id2, Line* currLine)
 	}
 }
 
-vector<int> Network::shareElement(std::vector<int> a, std::vector<int> b)
-{
-	vector<int> res;
-	for (int i = 0; i < a.size(); i++)
-	{
-		for (int j = 0; j < b.size(); j++)
-		{
-			if (a[i] == b[j]) {
-				res.push_back(a[i]);
-			}
-		}
-	}
-	return res;
-}
-
 Line* Network::getPrevLine(int currID)
 {
 	for (int i = 0; i < this->parentsTransfer.size(); i++)
@@ -423,7 +400,12 @@ void Network::dijkstraMinTime(int srcCode, int endCode, Time* currTime)
 			}
 	}
 
-	printPath(end);
+	string fileName = "putanja_" + to_string(srcCode) + "_" + to_string(endCode) + ".txt";
+	ofstream of(fileName);
+
+	writePath(end, of);
+
+	of.close();
 }
 
 void Network::dijkstraMinTransfer(int sourceCode, int endCode)
@@ -443,7 +425,7 @@ void Network::dijkstraMinTransfer(int sourceCode, int endCode)
 	this->addParent(-1, src, nullptr);
 	dist[src] = 0;
 
-	for (int i = 0; i < V - 1; i++) {
+	for (int i = 0; i < V ; i++) {
 
 		int u = minDistance(dist, visited);
 		visited[u] = true;
@@ -469,7 +451,10 @@ void Network::dijkstraMinTransfer(int sourceCode, int endCode)
 		}
 	}
 
-	printPath2(src, end);
+	string fileName = "putanja_" + to_string(sourceCode) + "_" + to_string(endCode) + ".txt";
+	ofstream of(fileName);
+
+	writePath2(src, end, of);
 }
 
 void Network::userInterface()
@@ -484,21 +469,13 @@ void Network::userInterface()
 		this->userInterfaceLoading();
 	}
 	else if (tmp == 100) {
-		this->loadNetwork("stajalista.txt", "linije.txt");
-		this->dijkstraMinTransfer(123, 1);
+		this->loadNetwork("stajalista1.txt", "linije1.txt");
+		this->dijkstraMinTransfer(0, 3);
 	}
 	else {
 		cout << "Greska: unesite validnu vrednost (1 ili 0)" << endl;
 		return;
 	}
-}
-
-void Network::printSolution(vector<int> dist, int src, int end)
-{
-	int V = this->stations.size();
-	int curr = src;
-
-	printPath(end);
 }
 
 void Network::addParent(int src, int dst, Line* l)
@@ -516,23 +493,23 @@ void Network::addParent(int src, int dst, Line* l)
 	this->parentsTransfer.push_back(tmp);
 }
 
-void Network::printPath(int j)
+void Network::writePath(int j, ofstream& of)
 {
 	if (this->parents[j]->parent == -1)
 		return;
 
-	printPath(this->parents[j]->parent);
+	writePath(this->parents[j]->parent, of);
 
 	if (this->parents[j]->lineID != this->parents[this->parents[j]->parent]->lineID) {
-		cout << "\n" << "->" << this->lines[this->parents[j]->lineID]->getName() << endl;
-		cout << this->stations[this->parents[j]->parent]->getCode() << " " << this->stations[j]->getCode() << " ";
+		of << "\n" << "->" << this->lines[this->parents[j]->lineID]->getName() << "\n";
+		of << this->stations[this->parents[j]->parent]->getCode() << " " << this->stations[j]->getCode() << " ";
 	}
 	else {
-		cout << this->stations[j]->getCode() << " ";
+		of << this->stations[j]->getCode() << " ";
 	}
 }
 
-void Network::printPath2(int source, int end)
+void Network::writePath2(int source, int end, ofstream& of)
 {
 	int curr = end;
 	stack<NodeTrf*> path;
@@ -546,12 +523,25 @@ void Network::printPath2(int source, int end)
 			}
 		}
 	}
-	for (int i = 0; i < path.size(); i++)
+
+	string prevName = "";
+
+	while(!path.empty())
 	{
-		cout << path.top()->dst << " " << path.top()->line->getId() << endl;
+		//cout << path.top()->dst << " " << path.top()->line->getId() << endl;
+		//path.pop();
+		if (path.top()->line->getName() != prevName) {
+			if (prevName != "") of << endl;
+			of << "->" << path.top()->line->getName() << endl;
+			of << this->stations[path.top()->src]->getCode() << " " << this->stations[path.top()->dst]->getCode();
+		}
+		else {
+			of << " " << this->stations[path.top()->dst]->getCode();
+		}
+		prevName = path.top()->line->getName();
 		path.pop();
 	}
-
+	of.close();
 }
 
 void Network::userInterfaceLoading()
@@ -562,7 +552,13 @@ void Network::userInterfaceLoading()
 	string linePath;
 	cout << "Molimo Vas, unesti putanju do fajla sa linijama:" << endl;
 	cin >> linePath;
-	this->loadNetwork(stationPath, linePath);
+	try{
+		this->loadNetwork(stationPath, linePath);
+	}
+	catch (InvalidPath err){
+		cout << err.what();
+		throw;
+	}
 	cout << "Gradska mreza je uspesno ucitana." << endl;
 	cout << "Molimo Vas, odaberite jednu od sledecih opcija:" << endl;
 	cout << "1. Prikaz informacija o stajalistu" << endl;
@@ -599,7 +595,13 @@ void Network::userInterfaceStation()
 	cout << "Unesite sifru stajalista koje Vas interesuje:" << endl;
 	int tmp;
 	cin >> tmp;
-	this->stationInformation(tmp);
+	try {
+		this->stationInformation(tmp);
+	}
+	catch (StationDoesntExist err) {
+		cout << err.what();
+		throw;
+	}
 	cout << "Informacije o stajalistu su Vam uspesno upisane u fajl stajaliste_" << tmp << endl;
 }
 
@@ -608,7 +610,13 @@ void Network::userInterfaceLine()
 	cout << "Unesite sifru linije koja Vas interesuje:" << endl;
 	string tmp;
 	cin >> tmp;
-	this->lineInformation(tmp);
+	try {
+		this->lineInformation(tmp);
+	}
+	catch (LineDoesntExist err) {
+		cout << err.what();
+		throw;
+	}
 	cout << "Informacije o liniji su Vam uspesno upisane u fajl linija_" << tmp << endl;
 }
 
@@ -617,7 +625,13 @@ void Network::userInterfaceStats()
 	cout << "Unesite sifru linije koja Vas interesuje:" << endl;
 	string tmp;
 	cin >> tmp;
-	this->lineStats(tmp);
+	try {
+		this->lineStats(tmp);
+	}
+	catch (LineDoesntExist err) {
+		cout << err.what();
+		throw;
+	}
 	cout << "Informacije o liniji su Vam uspesno upisane u fajl statistika_" << tmp << endl;
 }
 
@@ -649,6 +663,8 @@ void Network::userInterfacePath()
 		hh = stoi(shh);
 		smm = time.substr(3, 5);
 		mm = stoi(smm);
+		cout << "Unesti Vas JMBG:" << endl;
+		cin >> time;
 		this->dijkstraMinTime(src, end, new Time(hh, mm));
 		return;
 	case 3:

@@ -6,18 +6,19 @@
 using namespace std;
 
 int main() {
-	Network* net = new Network();
-	net->userInterface();
-	//net->loadNetwork("stajalista.txt", "linije.txt");
-	//net->printStations();
-	//net->printLines();
-	//cout << '\n';
-	//net->stationInformation(0);
-	//net->dijkstra(123, 1221, new Time(7, 0));
-	//net->lineInformation("12");
-	//net->lineStats("12");
-	//net->findPath(154, 578, minTime);
-	//net->printAdjMatrix();
+	try {
+		Network* net = new Network();
+		net->userInterface();
+	}
+	catch (InvalidPath err) {
+		return -3;
+	}
+	catch (StationDoesntExist err) {
+		return -3;
+	}
+	catch (LineDoesntExist err) {
+		return -3;
+	}
 
 	return 1;
 }

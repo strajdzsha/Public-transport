@@ -7,6 +7,7 @@
 #include <sstream>
 #include "Line.h"
 #include "Station.h"
+#include "Exceptions.h"
 
 /// <summary>
 /// This is main class. It coordinates between classes Line and Station. 
@@ -38,12 +39,6 @@ struct NodeTrf {
 class Network {
 public:
 	Network();
-	void loadNetwork(const std::string& stationsPath, const std::string& linesPath);
-	void stationInformation(int code);
-	void lineInformation(std::string lineName);
-	void lineStats(std::string lineName);
-	void dijkstraMinTime(int sourceCode, int endCode, Time* currTime = NULL);
-	void dijkstraMinTransfer(int sourceCode, int endCode);
 	void userInterface();
 private:
 	//Data
@@ -54,6 +49,13 @@ private:
 	std::vector<std::vector<StationLine*>> connectionMatrix;
 	std::vector<Node*> parents;
 	std::vector<NodeTrf*> parentsTransfer;
+	//Main functionalities
+	void loadNetwork(const std::string& stationsPath, const std::string& linesPath);
+	void stationInformation(int code);
+	void lineInformation(std::string lineName);
+	void lineStats(std::string lineName);
+	void dijkstraMinTime(int sourceCode, int endCode, Time* currTime = NULL);
+	void dijkstraMinTransfer(int sourceCode, int endCode);
 	//Loading functions
 	std::string readWord(const std::string& s, int& i, char thermChar);
 	std::string readWord2(const std::string& s, int& i, char thermChar);
@@ -68,9 +70,7 @@ private:
 	void userInterfaceStats();
 	void userInterfacePath();
 	//Other
-	std::vector<int> sharedLines(int id1, int id2);
 	std::vector<int> findStartingLines(int id);
-	std::vector<int> shareElement(std::vector<int> a, std::vector<int> b);
 	Line* getPrevLine(int currID);
 	int getStationId(int stationCode);
 	int getLineId(std::string lineName);
@@ -81,9 +81,8 @@ private:
 	void createEmptyAdjMatrix();
 	void createAdjMatrix();
 	void createConnectionMatrix();
-	void printPath(int j);
-	void printPath2(int i, int j);
-	void printSolution(std::vector<int> dist, int src, int end);
+	void writePath(int j, std::ofstream& of);
+	void writePath2(int i, int j, std::ofstream& of);
 	void addParent(int src, int dst, Line* l);
 };
 
