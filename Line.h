@@ -35,6 +35,7 @@ public:
 	void addConnection(int id1, int id2) { this->adjMatrix[id1][id2] = 1; }
 	void createEmptyAdjMatrix(int size);
 	void print();
+	std::vector<int> getStationIds();
 private:
 	std::string lineName;
 	std::vector<Station*> stations;

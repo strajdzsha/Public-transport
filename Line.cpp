@@ -89,3 +89,10 @@ bool Line::containsStation(int id)
 	}
 	return false;
 }
+
+std::vector<int> Line::getStationIds()
+{
+	vector<int> stationIds;
+	for (auto x : stations)stationIds.push_back(x->getId());
+	return stationIds;
+}

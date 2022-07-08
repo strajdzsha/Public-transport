@@ -21,6 +21,11 @@ struct Node {
 		this->parent = -1;
 		this->lineID = -1;
 	}
+
+	Node(int parent, int lineID) {
+		this->parent = parent;
+		this->lineID = lineID;
+	}
 	int parent, lineID;
 };
 
@@ -81,8 +86,7 @@ private:
 	void createEmptyAdjMatrix();
 	void createAdjMatrix();
 	void createConnectionMatrix();
-	void writePath(int j, std::ofstream& of);
-	void writePath2(int i, int j, std::ofstream& of);
+	void writePath(int j, int source, std::ofstream& of, std::vector<Node*> parents);
 	void addParent(int src, int dst, Line* l);
 };
 

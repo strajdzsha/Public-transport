@@ -1,6 +1,7 @@
 ﻿#include "Network.h"
 #include <iostream>
 #include <stack>
+#include <queue>
 
 using namespace std;
 #define TIME_BETWEEN_STATIONS 3;
@@ -403,50 +404,52 @@ void Network::dijkstraMinTime(int srcCode, int endCode, Time* currTime)
 	string fileName = "putanja_" + to_string(srcCode) + "_" + to_string(endCode) + ".txt";
 	ofstream of(fileName);
 
-	writePath(end, of);
+	writePath(end, src, of, this->parents);
 
 	of.close();
 }
 
 void Network::dijkstraMinTransfer(int sourceCode, int endCode)
 {
-	this->createAdjMatrix();
-	this->createConnectionMatrix();
+	int source = this->getStationId(sourceCode);
+	int curr = this->getStationId(sourceCode);
+	int end = this->getStationId(endCode);
+	queue<int> q;
+	vector<int> res;
+	vector<int> visited;
+	vector<Node*> parents;
+	for (int i = 0; i < this->stations.size(); i++) { res.push_back(-1); visited.push_back(0); parents.push_back(new Node()); }
+	q.push(curr);
+	while (!q.empty()) {
+		curr = q.front();
+		q.pop();
+		visited[curr] = 1;
+		vector<int> currLines = this->findStartingLines(curr);
 
-	int src = this->getStationId(sourceCode), end = this->getStationId(endCode), V = this->stations.size();
-	vector<int> dist(V);
-	vector<bool> visited(V);
-
-	for (int i = 0; i < V; i++) {
-		dist[i] = INT_MAX;
-		visited[i] = false;
-	}
-
-	this->addParent(-1, src, nullptr);
-	dist[src] = 0;
-
-	for (int i = 0; i < V ; i++) {
-
-		int u = minDistance(dist, visited);
-		visited[u] = true;
-
-		for (int j = 0; j < this->connectionMatrix[u].size(); j++)
-		{
-			StationLine* curr = this->connectionMatrix[u][j];
-			int v = curr->id;
-			Line* currLine = curr->line;
-			
-			Line* prevLine = getPrevLine(u);
-			int distance;
-			if (currLine == prevLine) {
-				distance = dist[u];
-			}
-			else {
-				distance = dist[u] + 1;
-			}
-			if (distance < dist[v]) {
-				dist[v] = distance;
-				addParent(u, v, currLine);
+		for (auto x : currLines) {
+			for (int i = 0; i < this->stations.size(); i++)
+			{
+				if (this->lineStationMatrix[x][i] == 1) {
+					if (!visited[i] && res[i] == -1) {
+						res[i] = res[curr] + 1;
+						int beg = curr; 
+						vector<int> orderedStations = this->lines[x]->getStationIds();
+						int idCurr = 0;
+						for (int j = 0; j < orderedStations.size(); j++) {
+							if (orderedStations[j] == curr) {
+								idCurr = j;
+								break;
+							}
+						}
+						
+						for (int j = idCurr; orderedStations[j] != i && j < orderedStations.size() - 1; j++) {
+							if (parents[orderedStations[j + 1]]->parent == -1)
+								parents[orderedStations[j + 1]] = new Node(orderedStations[j], x);
+						}
+										
+						q.push(i);
+					}
+				}
 			}
 		}
 	}
@@ -454,7 +457,9 @@ void Network::dijkstraMinTransfer(int sourceCode, int endCode)
 	string fileName = "putanja_" + to_string(sourceCode) + "_" + to_string(endCode) + ".txt";
 	ofstream of(fileName);
 
-	writePath2(src, end, of);
+	writePath(end, source, of, parents);
+
+	of.close();
 }
 
 void Network::userInterface()
@@ -469,8 +474,8 @@ void Network::userInterface()
 		this->userInterfaceLoading();
 	}
 	else if (tmp == 100) {
-		this->loadNetwork("stajalista1.txt", "linije1.txt");
-		this->dijkstraMinTransfer(0, 3);
+		this->loadNetwork("stajalista.txt", "linije.txt");
+		this->dijkstraMinTransfer(154, 1);
 	}
 	else {
 		cout << "Greska: unesite validnu vrednost (1 ili 0)" << endl;
@@ -493,55 +498,24 @@ void Network::addParent(int src, int dst, Line* l)
 	this->parentsTransfer.push_back(tmp);
 }
 
-void Network::writePath(int j, ofstream& of)
+void Network::writePath(int j, int source, std::ofstream& of, std::vector<Node*> parents)
 {
-	if (this->parents[j]->parent == -1)
+	if (parents[j]->parent == -1)
 		return;
 
-	writePath(this->parents[j]->parent, of);
+	writePath(parents[j]->parent, source, of, parents);
 
-	if (this->parents[j]->lineID != this->parents[this->parents[j]->parent]->lineID) {
-		of << "\n" << "->" << this->lines[this->parents[j]->lineID]->getName() << "\n";
-		of << this->stations[this->parents[j]->parent]->getCode() << " " << this->stations[j]->getCode() << " ";
+	if (parents[j]->lineID != parents[parents[j]->parent]->lineID) {
+		if (parents[j]->parent == source)
+			of << "->" << this->lines[parents[j]->lineID]->getName() << "\n";
+		else
+			of << "\n" << "->" << this->lines[parents[j]->lineID]->getName() << "\n";
+
+		of << this->stations[parents[j]->parent]->getCode() << " " << this->stations[j]->getCode() << " ";
 	}
 	else {
 		of << this->stations[j]->getCode() << " ";
 	}
-}
-
-void Network::writePath2(int source, int end, ofstream& of)
-{
-	int curr = end;
-	stack<NodeTrf*> path;
-	while (curr != source) {
-		for (int i = 0; i < this->parentsTransfer.size(); i++)
-		{
-			NodeTrf* tmp = this->parentsTransfer[i];
-			if (tmp->dst == curr) {
-				path.push(tmp);
-				curr = tmp->src;
-			}
-		}
-	}
-
-	string prevName = "";
-
-	while(!path.empty())
-	{
-		//cout << path.top()->dst << " " << path.top()->line->getId() << endl;
-		//path.pop();
-		if (path.top()->line->getName() != prevName) {
-			if (prevName != "") of << endl;
-			of << "->" << path.top()->line->getName() << endl;
-			of << this->stations[path.top()->src]->getCode() << " " << this->stations[path.top()->dst]->getCode();
-		}
-		else {
-			of << " " << this->stations[path.top()->dst]->getCode();
-		}
-		prevName = path.top()->line->getName();
-		path.pop();
-	}
-	of.close();
 }
 
 void Network::userInterfaceLoading()
